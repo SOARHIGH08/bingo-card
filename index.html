@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4x4 Card with Fixed Rectangle Boxes</title>
+<style>
+  body {
+    font-family: 'Poppins', sans-serif;
+  }
+  .container {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    width: 300px;
+    margin: 20px auto;
+  }
+  .box {
+    width: 65px;
+    height: 65px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5em;
+    font-weight: bold;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.3s ease;
+    background-color: #656565; /* Default background for empty boxes */
+    border: 1px solid black;
+    border-radius: 15px;
+    transition: 300ms;
+  }
+  .box.disabled {
+    cursor: not-allowed;
+  }
+  .marked {
+    background-color: gray !important;
+    border-radius: 0;
+    color: black;
+    border: 0;
+    outline: 10px solid red;
+    outline-offset: 10px/-10px;
+    transition: 300ms;
+  }
+  .controls {
+    display: flex;
+    justify-content: space-between;
+    max-width: 300px;
+    margin: 20px auto;
+  }
+  .button {
+    padding: 10px 20px;
+    font-size: 1em;
+    cursor: pointer;
+  }
+
+  #boxContainer {
+  display: grid;
+  grid-template-columns: repeat(4, 100px);
+  gap: 120px;
+  justify-content: center; /* Center the grid horizontally */
+}
+#selectedPatternName {
+  font-size: 16px;
+  font-weight: bold;
+  text-align: center;
+  margin-top: 10px;
+}
+
+
+</style>
+</head>
+<body>
+  <select id="patternSelect">
+    <option value="">Select a Pattern</option>
+  </select>
+  <button id="randomPatternBtn">Random Pattern</button>
+  <p id="selectedPatternName"></p>
+  <div id="boxPatternContainer" style="display: grid; grid-template-columns: repeat(4, 50px); gap: 5px; width: 220px; margin: 0 auto;"></div>
+  
+<div id="card" class="container"></div>
+
+<div class="controls">
+  <button class="button" onclick="populateRandom()" id="populateBtn">Auto Populate</button>
+  <button class="button" onclick="disableEditing()" id="playBtn">Set and Play</button>
+</div>
+
+<div class="controls">
+  <button class="button" onclick="resetCard()">Reset</button>
+</div>
+
+<div id="setCodeDisplay" style="text-align:center; font-size:1.2em; margin-top:10px;"></div>
+
+<script>
+const card = document.getElementById('card');
+const setCodeDisplay = document.getElementById('setCodeDisplay');
+const totalBoxes = 16;
+let filledBoxes = Array(totalBoxes).fill(null);
+let editingDisabled = false;
+let usedAutoPopulate = false;
+
+// Color scheme for billiard balls
+const colors = [
+  '#FFD700', // 1: Yellow
+  '#0000FF', // 2: Blue
+  '#FF0000', // 3: Red
+  '#008000', // 4: Green
+  '#800080', // 5: Purple
+  '#FF4500', // 6: Orange
+  '#800000', // 7: Maroon
+  '#000000', // 8: Black
+  '#FFFF00', // 9: Yellow
+  '#ADD8E6', // 10: Light Blue
+  '#FF6347', // 11: Tomato
+  '#3CB371', // 12: Medium Sea Green
+  '#4682B4', // 13: Steel Blue
+  '#D2691E', // 14: Chocolate
+  '#A52A2A', // 15: Brown
+  '#faebd7'  // Q (16): Dark Red
+];
+
+// Generate 4x4 grid of fixed rectangular boxes
+function createGrid() {
+  card.innerHTML = '';
+  filledBoxes = Array(totalBoxes).fill(null);
+  editingDisabled = false;
+  setCodeDisplay.textContent = '';
+  usedAutoPopulate = false;
+
+  for (let i = 0; i < totalBoxes; i++) {
+    const box = document.createElement('div');
+    box.classList.add('box');
+    box.textContent = '?';
+    box.onclick = () => handleBoxClick(i);
+    card.appendChild(box);
+  }
+}
+
+// Populate empty boxes with unassigned numbers
+// Populate empty boxes with unassigned numbers and refresh on each click
+function populateRandom() {
+  if (editingDisabled) return;
+
+  if (filledBoxes.every(item => item === null)) {
+    usedAutoPopulate = true; 
+
+    setTimeout(() => {
+      disableEditing()
+    }, 0);
+  }
+
+  // Clear previously auto-populated (empty) boxes
+  document.querySelectorAll('.box').forEach((box, i) => {
+    if (!filledBoxes[i]) {
+      clearBox(box); // Clear the box content
+    }
+  });
+
+  // Re-generate the list of unassigned numbers
+  const availableNumbers = [];
+  for (let i = 1; i <= totalBoxes; i++) {
+    if (!filledBoxes.includes(i)) {
+      availableNumbers.push(i);
+    }
+  }
+
+  // Re-populate the empty boxes with new random numbers
+  document.querySelectorAll('.box').forEach((box, i) => {
+    if (!filledBoxes[i] && availableNumbers.length > 0) {
+      // Randomly select a number from available numbers
+      const randomIndex = Math.floor(Math.random() * availableNumbers.length);
+      const number = availableNumbers.splice(randomIndex, 1)[0];
+
+      // Set the box with the new number and update filledBoxes
+      setBoxNumber(box, number);
+      filledBoxes[i] = number;
+    }
+  });
+}
+
+
+// Handle individual box click for manual assignment
+// Handle individual box click for manual assignment and play mode
+function handleBoxClick(index) {
+  const box = card.children[index];
+
+  if (!editingDisabled) {
+    // In setup mode
+    if (!filledBoxes[index]) {
+      const nextNumber = getNextAvailableNumber();
+      if (nextNumber <= totalBoxes) {
+        setBoxNumber(box, nextNumber);
+        filledBoxes[index] = nextNumber;
+      }
+    } else {
+      clearBox(box);
+      filledBoxes[index] = null;
+    }
+  } else {
+    // In play mode - toggle marked state and apply conditional color
+    box.classList.toggle('marked');
+    
+    // Check if the box is marked to apply contrast color
+    const number = filledBoxes[index];
+    if (box.classList.contains('marked')) {
+    } else {
+      // Reset color when unmarked
+      box.style.color = [8, 7, 5, 4, 15, 2].includes(number) ? '#FFF' : '#000';
+    }
+  }
+}
+
+
+// Set a box with a specific number and its associated color
+function setBoxNumber(box, number) {
+  box.textContent = number === 16 ? 'Q' : number;
+  box.style.backgroundColor = colors[number - 1];
+  box.style.color = [8, 7, 5, 4, 15, 2].includes(number) ? '#FFF' : '#000';
+  animateBox(box);
+}
+
+// Clear the content and color of a box
+function clearBox(box) {
+  box.textContent = '?';
+  box.style.color = 'white';
+  box.style.backgroundColor = '#656565'; // Reset to default empty background
+  animateBox(box);
+}
+
+// Find the next available (smallest unassigned) number
+function getNextAvailableNumber() {
+  for (let i = 1; i <= totalBoxes; i++) {
+    if (!filledBoxes.includes(i)) {
+      return i;
+    }
+  }
+  return totalBoxes + 1;
+}
+
+// Animation effect for box changes
+function animateBox(box) {
+  box.classList.add('marked');
+  setTimeout(() => {
+    box.classList.remove('marked');
+  }, 200);
+}
+
+// Disable editing once all boxes are filled
+function disableEditing() {
+  if (filledBoxes.every(n => n)) {
+    editingDisabled = true;
+    Array.from(card.children).forEach(box => box.classList.add('disabled'));
+    
+    // Generate code (military time) and display it
+    const date = new Date();
+    let code = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }).replace(":", "");
+
+
+    if (usedAutoPopulate) {
+      code += " (auto-populate)"; // Append "auto-populate" to the code
+    }
+
+    setCodeDisplay.textContent = `Card Set Code: ${code}`;
+
+    populateBtn.disabled = true;
+    playBtn.disabled = true;
+
+
+  } else {
+    alert('Please fill all boxes first.');
+  }
+}
+
+// Reset card after confirmation
+function resetCard() {
+  if (confirm('Are you sure you want to reset?')) {
+    createGrid();
+    populateBtn.disabled = false;
+    playBtn.disabled = false;
+  }
+}
+
+// Initialize grid on load
+createGrid();
+
+var patterns = [
+  { name: "Pattern A", value: "1,5,9,13" },        // Vertical column
+  { name: "Pattern B", value: "1,2,3,4" },         // Horizontal line
+  { name: "Pattern C", value: "1,2,3,5,6,7,9,10,11" }, // Perfect square 3x3
+  { name: "Pattern D", value: "1,4,5,8,9,12,14,15" }, // Custom pattern (corner boxes)
+  { name: "Pattern E", value: "1,4,6,7,10,11,13,16" },    // Left to right diagonal
+  { name: "Pattern F", value: "2,3,5,8,9,12,14,15" }     // Another custom pattern
+];
+
+var patternSelect = document.getElementById("patternSelect");
+var boxPatternContainer = document.getElementById("boxPatternContainer");
+var randomPatternBtn = document.getElementById("randomPatternBtn");
+var selectedPatternName = document.getElementById("selectedPatternName");
+
+// Populate the dropdown with pattern names
+patterns.forEach(function(pattern, index) {
+  var option = document.createElement("option");
+  option.value = pattern.value;
+  option.textContent = pattern.name;
+  patternSelect.appendChild(option);
+});
+
+// Function to generate the 4x4 grid and apply the pattern
+function generateGrid(patternValue) {
+  boxPatternContainer.innerHTML = ""; // Clear previous grid
+  var selectedPattern = patternValue.split(','); // Get pattern as array
+  var specialPosition = selectedPattern.indexOf('Q') >= 0 ? 15 : null; // Q represents the 16th box
+
+  // Create a 4x4 grid of boxes
+  for (let i = 1; i <= 16; i++) {
+    var boxPattern = document.createElement("div");
+    // boxPattern.classList.add("box");
+    boxPattern.style.width = "50px";
+    boxPattern.style.height = "50px";
+    boxPattern.style.border = "1px solid black";
+    boxPattern.style.backgroundColor = "black";
+
+    if (selectedPattern.includes(i.toString()) || i === specialPosition) {
+      boxPattern.style.backgroundColor = "red"; // Highlight for the pattern
+    }
+
+    boxPatternContainer.appendChild(boxPattern);
+  }
+}
+
+// Handle pattern selection from dropdown
+patternSelect.addEventListener("change", function() {
+  var selectedPattern = patternSelect.value;
+  var selectedName = patterns.find((pattern) => pattern.value === selectedPattern).name;
+  selectedPatternName.textContent = `Selected: ${selectedName}`;
+  generateGrid(selectedPattern);
+});
+
+// Handle random pattern selection
+randomPatternBtn.addEventListener("click", function() {
+  var randomPattern = patterns[Math.floor(Math.random() * patterns.length)];
+  patternSelect.value = randomPattern.value;
+  selectedPatternName.textContent = `Selected: ${randomPattern.name}`;
+  generateGrid(randomPattern.value);
+});
+
+
+
+</script>
+
+</body>
+</html>
