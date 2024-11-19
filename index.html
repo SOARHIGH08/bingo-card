@@ -161,7 +161,8 @@
   });
 
   customRandomPatternBtn.addEventListener("click", function() {
-  whatGame = 'random5';
+    patternSelect.disabled = true;
+    whatGame = 'random5';
     randomPatternBtn.disabled = true;
     // Generate 5 unique random positions for the pattern
     const randomPatternPositions = [];
@@ -357,6 +358,7 @@
       customRandomPatternBtn.disabled = false;
       randomPatternBtn.disabled = false;
       whatGame = 'regular';
+      patternSelect.disabled = false;
     }
   }
 
